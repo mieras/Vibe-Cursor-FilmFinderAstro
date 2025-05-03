@@ -21,10 +21,29 @@ let query = supabase.from("products").select(`
     )
   `);
 if (format) query = query.eq("format", format);
-if (brand) query = query.eq("brands.name", brand);
+if (brand) query = query.eq("brand_id", brand);
 if (iso) query = query.eq("iso", parseInt(iso));
 // Land filteren gebeurt later op de prijzen
 const { data: products, error } = await query.order("name");
+
+// Haal unieke merken op
+const { data: brands, error: brandsError } = await supabase
+  .from("brands")
+  .select("id, name")
+  .order("name");
+
+console.log("Brands data:", brands);
+console.log("Brands error:", brandsError);
+
+const brandOptions = [
+  { value: "", label: "Alle merken" },
+  ...(brands?.map((b) => ({
+    value: b.id,
+    label: b.name.charAt(0).toUpperCase() + b.name.slice(1),
+  })) || []),
+];
+
+console.log("Brand options:", brandOptions);
 
 const productsWithPrices =
   (products as any[] | null)?.map((product) => {
@@ -65,12 +84,6 @@ const formatOptions = [
   { value: "35mm", label: "35mm" },
   { value: "120", label: "120" },
   { value: "sheet", label: "Sheet film" },
-];
-const brandOptions = [
-  { value: "", label: "Alle merken" },
-  { value: "ilford", label: "Ilford" },
-  { value: "kodak", label: "Kodak" },
-  { value: "fuji", label: "Fujifilm" },
 ];
 const isoOptions = [
   { value: "", label: "Alle ISO's" },

@@ -50,7 +50,7 @@ export default function FilmFinderClient({
     sort: "name",
   });
 
-  console.log(products);
+  // console.log(products);
 
   return (
     <>
