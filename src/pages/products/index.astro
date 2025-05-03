@@ -35,16 +35,16 @@ const { data: products, error } = await query.order("name");
 // Verwerk de prijzen om de laagste prijs per product te vinden
 const productsWithPrices =
   products?.map((product) => {
-    const prices = product.prices?.flatMap((p) => p.prices) || [];
+    const prices = product.prices?.flatMap((p: any) => p.prices) || [];
 
     // Filter prijzen op land als er een land is geselecteerd
     const filteredPrices = country
-      ? prices.filter((p) => p.store?.country === country)
+      ? prices.filter((p: any) => p.store?.country === country)
       : prices;
 
     const lowestPrice =
       filteredPrices.length > 0
-        ? Math.min(...filteredPrices.map((p) => p.price))
+        ? Math.min(...filteredPrices.map((p: any) => p.price))
         : null;
 
     return {

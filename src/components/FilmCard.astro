@@ -1,0 +1,99 @@
+---
+interface Store {
+  name: string;
+  url?: string;
+}
+
+interface Props {
+  name: string;
+  brand?: string;
+  format: string;
+  iso: number;
+  image_url?: string;
+  lowestPrice?: number | null;
+  stores?: string;
+  href: string;
+}
+
+const {
+  name,
+  brand = "",
+  format = "",
+  iso = 0,
+  image_url = "",
+  lowestPrice = null,
+  stores = "[]",
+  href = "#",
+} = Astro.props;
+
+// Voorkom rendering als name ontbreekt
+if (!name) {
+  return null;
+}
+
+// Debug (eventueel tijdelijk)
+console.log("FilmCard props", Astro.props);
+
+// Parse stores
+let storesArr: Store[] = [];
+try {
+  const parsed = JSON.parse(stores);
+  if (Array.isArray(parsed)) {
+    storesArr = parsed;
+  }
+} catch (e) {
+  console.warn("Invalid stores JSON", e);
+}
+---
+
+<div
+  class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 flex flex-col h-full min-h-[220px] transition hover:shadow-lg"
+>
+  <a
+    href={href}
+    class="flex items-center gap-3 mb-2 focus:outline-none focus:ring-2 focus:ring-primary"
+    aria-label={`Bekijk ${name}`}
+  >
+    <img
+      src={image_url || "https://via.placeholder.com/64?text=Film"}
+      alt={name}
+      class="w-16 h-16 object-contain rounded bg-gray-100"
+      loading="lazy"
+    />
+    <div>
+      <div class="font-semibold text-lg leading-tight">
+        {brand ? `${brand} ` : ""}{name}
+      </div>
+      <div class="text-gray-500 text-sm">
+        {format ? `${format} • ` : ""}ISO {iso > 0 ? iso : "?"}
+      </div>
+    </div>
+  </a>
+
+  <div class="text-2xl font-bold mb-1 mt-auto">
+    {
+      lowestPrice !== null ? (
+        `€${lowestPrice.toFixed(2)}`
+      ) : (
+        <span class="text-gray-400 text-base">Niet beschikbaar</span>
+      )
+    }
+  </div>
+
+  {
+    storesArr.length > 0 && (
+      <div class="text-xs text-gray-500 mt-1">
+        Goedkoopste winkel{storesArr.length > 1 ? "s" : ""}:{" "}
+        <span
+          set:html={storesArr
+            .map((store) =>
+              store.url
+                ? `<a href="${store.url}" class="underline hover:text-blue-600" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">${store.name}</a>`
+                : store.name
+            )
+            .join(", ")}
+        />
+      </div>
+    )
+  }
+</div>
