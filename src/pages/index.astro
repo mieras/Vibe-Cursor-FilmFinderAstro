@@ -32,7 +32,7 @@ const { data: brands, error: brandsError } = await supabase
   .select("id, name")
   .order("name");
 
-console.log("Brands data:", brands);
+// console.log("Brands data:", brands);
 console.log("Brands error:", brandsError);
 
 const brandOptions = [
@@ -43,7 +43,7 @@ const brandOptions = [
   })) || []),
 ];
 
-console.log("Brand options:", brandOptions);
+// console.log("Brand options:", brandOptions);
 
 const productsWithPrices =
   (products as any[] | null)?.map((product) => {
