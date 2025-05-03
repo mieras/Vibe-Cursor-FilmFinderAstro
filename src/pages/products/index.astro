@@ -1,0 +1,171 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import ProductFilters from "../../components/ProductFilters.astro";
+import { supabase } from "../../lib/supabase";
+// Haal query parameters op
+const format = Astro.url.searchParams.get("format");
+const brand = Astro.url.searchParams.get("brand");
+const iso = Astro.url.searchParams.get("iso");
+const country = Astro.url.searchParams.get("country");
+
+// Bouw de query op basis van filters
+let query = supabase.from("products").select(`
+    *,
+    brand:brands(name),
+    prices:product_urls(
+      prices(price, created_at),
+      store:stores(country)
+    )
+  `);
+
+// Pas filters toe
+if (format) {
+  query = query.eq("format", format);
+}
+if (brand) {
+  query = query.eq("brands.name", brand);
+}
+if (iso) {
+  query = query.eq("iso", parseInt(iso));
+}
+
+// Haal producten op
+const { data: products, error } = await query.order("name");
+
+// Verwerk de prijzen om de laagste prijs per product te vinden
+const productsWithPrices =
+  products?.map((product) => {
+    const prices = product.prices?.flatMap((p) => p.prices) || [];
+
+    // Filter prijzen op land als er een land is geselecteerd
+    const filteredPrices = country
+      ? prices.filter((p) => p.store?.country === country)
+      : prices;
+
+    const lowestPrice =
+      filteredPrices.length > 0
+        ? Math.min(...filteredPrices.map((p) => p.price))
+        : null;
+
+    return {
+      ...product,
+      lowestPrice,
+      brand: product.brand?.name,
+    };
+  }) || [];
+---
+
+<Layout title="FilmFinder - Alle producten">
+  <main class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-8">
+      <h1 class="text-3xl font-bold">Alle producten</h1>
+      <div class="flex gap-4">
+        <select
+          id="sort"
+          class="px-4 py-2 rounded-md border border-input bg-background"
+        >
+          <option value="name">Naam</option>
+          <option value="price_asc">Prijs (laag-hoog)</option>
+          <option value="price_desc">Prijs (hoog-laag)</option>
+          <option value="iso">ISO</option>
+        </select>
+      </div>
+    </div>
+
+    <ProductFilters
+      selectedFormat={format?.toString()}
+      selectedBrand={brand?.toString()}
+      selectedIso={iso?.toString()}
+      selectedCountry={country?.toString()}
+    />
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {
+        productsWithPrices.map((product) => (
+          <a
+            href={`/products/${product.id}`}
+            class="bg-card p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow"
+          >
+            <div class="flex justify-between items-start mb-4">
+              <div>
+                <h2 class="text-xl font-semibold">
+                  {product.brand} {product.name}
+                </h2>
+                <p class="text-muted-foreground">
+                  {product.format} • ISO {product.iso} • {product.exposures}{" "}
+                  opnames
+                </p>
+              </div>
+              {product.image_url && (
+                <img
+                  src={product.image_url}
+                  alt={product.name}
+                  class="w-16 h-16 object-contain"
+                />
+              )}
+            </div>
+
+            <div class="mt-4">
+              {product.lowestPrice ? (
+                <p class="text-2xl font-bold">
+                  €{product.lowestPrice.toFixed(2)}
+                </p>
+              ) : (
+                <p class="text-muted-foreground">Geen prijs beschikbaar</p>
+              )}
+            </div>
+
+            <div class="mt-4 text-sm text-muted-foreground">
+              <p>EAN: {product.ean}</p>
+            </div>
+          </a>
+        ))
+      }
+    </div>
+  </main>
+</Layout>
+
+<script>
+  // Client-side sortering
+  const sortSelect = document.getElementById("sort");
+  const productGrid = document.querySelector(".grid");
+
+  sortSelect?.addEventListener("change", (e: Event) => {
+    const products = Array.from(productGrid?.children || []);
+    const sortBy = (e.target as HTMLSelectElement)?.value;
+
+    products.sort((a, b) => {
+      const priceA = parseFloat(
+        a.querySelector(".text-2xl")?.textContent?.replace("€", "") || "0"
+      );
+      const priceB = parseFloat(
+        b.querySelector(".text-2xl")?.textContent?.replace("€", "") || "0"
+      );
+      const nameA = a.querySelector("h2")?.textContent || "";
+      const nameB = b.querySelector("h2")?.textContent || "";
+      const isoA = parseInt(
+        a
+          .querySelector(".text-muted-foreground")
+          ?.textContent?.match(/ISO (\d+)/)?.[1] || "0"
+      );
+      const isoB = parseInt(
+        b
+          .querySelector(".text-muted-foreground")
+          ?.textContent?.match(/ISO (\d+)/)?.[1] || "0"
+      );
+
+      switch (sortBy) {
+        case "price_asc":
+          return priceA - priceB;
+        case "price_desc":
+          return priceB - priceA;
+        case "iso":
+          return isoA - isoB;
+        default:
+          return nameA.localeCompare(nameB);
+      }
+    });
+
+    products.forEach((product) => productGrid?.appendChild(product));
+  });
+</script>

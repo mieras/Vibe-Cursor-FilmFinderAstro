@@ -1,0 +1,133 @@
+---
+interface Props {
+  selectedFormat?: string;
+  selectedBrand?: string;
+  selectedIso?: string;
+  selectedCountry?: string;
+}
+
+const { selectedFormat, selectedBrand, selectedIso, selectedCountry } =
+  Astro.props;
+---
+
+<div class="bg-card p-6 rounded-lg shadow-lg mb-8">
+  <form class="space-y-4" method="get">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div>
+        <label for="format" class="block text-sm font-medium mb-2"
+          >Formaat</label
+        >
+        <select
+          id="format"
+          name="format"
+          class="w-full px-4 py-2 rounded-md border border-input bg-background"
+        >
+          <option value="">Alle formaten</option>
+          <option value="35mm" selected={selectedFormat === "35mm"}>35mm</option
+          >
+          <option value="120" selected={selectedFormat === "120"}>120</option>
+          <option value="sheet" selected={selectedFormat === "sheet"}
+            >Sheet film</option
+          >
+        </select>
+      </div>
+
+      <div>
+        <label for="brand" class="block text-sm font-medium mb-2">Merk</label>
+        <select
+          id="brand"
+          name="brand"
+          class="w-full px-4 py-2 rounded-md border border-input bg-background"
+        >
+          <option value="">Alle merken</option>
+          <option value="ilford" selected={selectedBrand === "ilford"}
+            >Ilford</option
+          >
+          <option value="kodak" selected={selectedBrand === "kodak"}
+            >Kodak</option
+          >
+          <option value="fuji" selected={selectedBrand === "fuji"}
+            >Fujifilm</option
+          >
+        </select>
+      </div>
+
+      <div>
+        <label for="iso" class="block text-sm font-medium mb-2">ISO</label>
+        <select
+          id="iso"
+          name="iso"
+          class="w-full px-4 py-2 rounded-md border border-input bg-background"
+        >
+          <option value="">Alle ISO's</option>
+          <option value="50" selected={selectedIso === "50"}>50</option>
+          <option value="100" selected={selectedIso === "100"}>100</option>
+          <option value="200" selected={selectedIso === "200"}>200</option>
+          <option value="400" selected={selectedIso === "400"}>400</option>
+          <option value="800" selected={selectedIso === "800"}>800</option>
+          <option value="1600" selected={selectedIso === "1600"}>1600</option>
+          <option value="3200" selected={selectedIso === "3200"}>3200</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="country" class="block text-sm font-medium mb-2">Land</label>
+        <select
+          id="country"
+          name="country"
+          class="w-full px-4 py-2 rounded-md border border-input bg-background"
+        >
+          <option value="">Alle landen</option>
+          <option value="nl" selected={selectedCountry === "nl"}
+            >Nederland</option
+          >
+          <option value="be" selected={selectedCountry === "be"}>België</option>
+          <option value="de" selected={selectedCountry === "de"}
+            >Duitsland</option
+          >
+        </select>
+      </div>
+    </div>
+
+    <div class="flex justify-between items-center">
+      <button
+        type="submit"
+        class="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90 transition-opacity"
+      >
+        Filteren
+      </button>
+
+      <select
+        id="sort"
+        class="px-4 py-2 rounded-md border border-input bg-background"
+      >
+        <option value="name">Naam</option>
+        <option value="price_asc">Prijs (laag-hoog)</option>
+        <option value="price_desc">Prijs (hoog-laag)</option>
+        <option value="iso">ISO</option>
+      </select>
+    </div>
+  </form>
+</div>
+
+<script>
+  const form = document.getElementById("filter-form");
+
+  form?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target as HTMLFormElement);
+    const params = new URLSearchParams();
+
+    for (const [key, value] of formData.entries()) {
+      if (value) {
+        params.append(key, value as string);
+      }
+    }
+
+    window.location.href = `/products?${params.toString()}`;
+  });
+
+  form?.addEventListener("reset", () => {
+    window.location.href = "/products";
+  });
+</script>

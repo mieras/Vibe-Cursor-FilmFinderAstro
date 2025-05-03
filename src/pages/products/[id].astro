@@ -1,0 +1,347 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { supabase } from "../../lib/supabase";
+import type { Chart } from "chart.js";
+import type { ChartDataset } from "chart.js";
+
+interface Price {
+  price: number;
+  date: Date;
+  store: string;
+  currency: string;
+}
+
+interface Store {
+  id: string;
+  name: string;
+  country: string;
+  currency: string;
+  logo_url: string | null;
+}
+
+interface CurrentPrice {
+  store: Store;
+  price: number | null;
+  inStock: boolean;
+  url: string;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  brand: {
+    name: string;
+    logo_url: string | null;
+  };
+  format: string;
+  iso: number;
+  exposures: number;
+  ean: string;
+  image_url: string | null;
+  description: string | null;
+  product_urls: {
+    id: string;
+    url: string;
+    last_price: number | null;
+    last_stock_status: boolean;
+    store: Store;
+    prices: {
+      price: number;
+      in_stock: boolean;
+      created_at: string;
+    }[];
+  }[];
+}
+
+interface TemplateData {
+  product: Product;
+  currentPrices: CurrentPrice[];
+  priceHistoryData: string;
+}
+
+// Haal het product ID uit de URL
+const { id } = Astro.params;
+
+// Haal het product op met alle gerelateerde data
+const { data: product, error } = await supabase
+  .from("products")
+  .select(
+    `
+    *,
+    brand:brands(name, logo_url),
+    product_urls(
+      id,
+      url,
+      last_price,
+      last_stock_status,
+      store:stores(
+        id,
+        name,
+        country,
+        currency,
+        logo_url
+      ),
+      prices(
+        price,
+        in_stock,
+        created_at
+      )
+    )
+  `
+  )
+  .eq("id", id)
+  .single();
+
+if (!product) {
+  return Astro.redirect("/404");
+}
+
+// Type assertion voor het product
+const typedProduct = product as unknown as Product;
+
+// Verwerk de prijsdata voor de grafiek
+const priceHistory: Price[] =
+  typedProduct.product_urls
+    ?.flatMap((pu) =>
+      pu.prices.map((p) => ({
+        price: p.price,
+        date: new Date(p.created_at),
+        store: pu.store.name,
+        currency: pu.store.currency,
+      }))
+    )
+    .sort((a, b) => a.date.getTime() - b.date.getTime()) || [];
+
+// Groepeer prijzen per winkel
+const currentPrices: CurrentPrice[] =
+  typedProduct.product_urls
+    ?.map((pu) => ({
+      store: pu.store,
+      price: pu.last_price,
+      inStock: pu.last_stock_status,
+      url: pu.url,
+    }))
+    .sort((a, b) => (a.price || Infinity) - (b.price || Infinity)) || [];
+
+// Maak de prijsdata beschikbaar voor de client
+const priceHistoryData = JSON.stringify(priceHistory);
+
+// Maak de data beschikbaar voor de template
+const templateData: TemplateData = {
+  product: typedProduct,
+  currentPrices,
+  priceHistoryData,
+};
+---
+
+<Layout
+  title={`${templateData.product.brand.name} ${templateData.product.name} - FilmFinder`}
+>
+  <main class="container mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto">
+      <div class="bg-card p-6 rounded-lg shadow-lg mb-8">
+        <div class="flex items-start gap-6">
+          {
+            templateData.product.image_url && (
+              <img
+                src={templateData.product.image_url}
+                alt={templateData.product.name}
+                class="w-32 h-32 object-contain"
+              />
+            )
+          }
+          <div>
+            <div class="flex items-center gap-4 mb-2">
+              <h1 class="text-3xl font-bold">
+                {templateData.product.brand.name}
+                {templateData.product.name}
+              </h1>
+              {
+                templateData.product.brand.logo_url && (
+                  <img
+                    src={templateData.product.brand.logo_url}
+                    alt={templateData.product.brand.name}
+                    class="h-8 object-contain"
+                  />
+                )
+              }
+            </div>
+            <p class="text-muted-foreground mb-4">
+              {templateData.product.format} • ISO {templateData.product.iso} • {
+                templateData.product.exposures
+              } opnames
+            </p>
+            <p class="text-sm text-muted-foreground">
+              EAN: {templateData.product.ean}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Prijzen per winkel -->
+        <div class="bg-card p-6 rounded-lg shadow-lg">
+          <h2 class="text-xl font-semibold mb-4">Huidige prijzen</h2>
+          <div class="space-y-4">
+            {
+              templateData.currentPrices.map((price: CurrentPrice) => (
+                <a
+                  href={price.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="flex items-center justify-between p-4 rounded-md border border-input hover:bg-muted transition-colors"
+                >
+                  <div class="flex items-center gap-4">
+                    {price.store.logo_url && (
+                      <img
+                        src={price.store.logo_url}
+                        alt={price.store.name}
+                        class="h-8 object-contain"
+                      />
+                    )}
+                    <div>
+                      <p class="font-medium">{price.store.name}</p>
+                      <p class="text-sm text-muted-foreground">
+                        {price.store.country}
+                      </p>
+                    </div>
+                  </div>
+                  <div class="text-right">
+                    {price.price ? (
+                      <p class="text-xl font-bold">
+                        {price.store.currency} {price.price.toFixed(2)}
+                      </p>
+                    ) : (
+                      <p class="text-muted-foreground">
+                        Geen prijs beschikbaar
+                      </p>
+                    )}
+                    {!price.inStock && (
+                      <p class="text-sm text-destructive">Niet op voorraad</p>
+                    )}
+                  </div>
+                </a>
+              ))
+            }
+          </div>
+        </div>
+
+        <!-- Prijsgeschiedenis -->
+        <div class="bg-card p-6 rounded-lg shadow-lg">
+          <h2 class="text-xl font-semibold mb-4">Prijsgeschiedenis</h2>
+          <div class="h-64">
+            <canvas id="priceChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Product details -->
+      {
+        templateData.product.description && (
+          <div class="bg-card p-6 rounded-lg shadow-lg mt-8">
+            <h2 class="text-xl font-semibold mb-4">Product details</h2>
+            <p class="text-muted-foreground">
+              {templateData.product.description}
+            </p>
+          </div>
+        )
+      }
+    </div>
+  </main>
+</Layout>
+
+<script>
+  import Chart from "chart.js/auto";
+  import type { ChartDataset } from "chart.js";
+
+  interface PriceData {
+    price: number;
+    date: Date;
+    store: string;
+    currency: string;
+  }
+
+  function initChart() {
+    // Haal de prijsdata op
+    const priceHistoryData =
+      document.getElementById("priceHistoryData")?.textContent;
+    if (!priceHistoryData) return;
+
+    const priceHistory = JSON.parse(priceHistoryData) as PriceData[];
+
+    // Groepeer prijzen per winkel
+    const stores = [...new Set(priceHistory.map((p: PriceData) => p.store))];
+    const datasets = stores.map((store) => {
+      const storePrices = priceHistory.filter(
+        (p: PriceData) => p.store === store
+      );
+      return {
+        label: store,
+        data: storePrices.map((p: PriceData) => ({
+          x: p.date,
+          y: p.price,
+        })),
+        borderColor: `hsl(${Math.random() * 360}, 70%, 50%)`,
+        tension: 0.1,
+      };
+    });
+
+    // Maak de grafiek
+    const ctx = document.getElementById("priceChart") as HTMLCanvasElement;
+    new Chart(ctx, {
+      type: "line",
+      data: {
+        datasets,
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            type: "time",
+            time: {
+              unit: "day",
+            },
+            title: {
+              display: true,
+              text: "Datum",
+            },
+          },
+          y: {
+            title: {
+              display: true,
+              text: "Prijs",
+            },
+          },
+        },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: (context: any) => {
+                const price = context.raw.y;
+                const currency =
+                  priceHistory.find(
+                    (p: PriceData) => p.store === context.dataset.label
+                  )?.currency || "€";
+                return `${context.dataset.label}: ${currency} ${price.toFixed(
+                  2
+                )}`;
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  // Initialiseer de grafiek wanneer de pagina is geladen
+  document.addEventListener("DOMContentLoaded", initChart);
+</script>
+
+<script define:vars={{ priceHistoryData }}>
+  // Maak de prijsdata beschikbaar voor de client
+  const script = document.createElement("script");
+  script.id = "priceHistoryData";
+  script.textContent = priceHistoryData;
+  document.head.appendChild(script);
+</script>
